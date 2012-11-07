@@ -53,10 +53,10 @@ getKinokoSprite = liftM kinokoSprite ask
 
 setCamera :: Kinoko -> Camera -> Camera
 setCamera Kinoko {pos = P2 x y} rect@(Rect _ _ w h) = rect {rectX = x'', rectY = y''}
-	where
-		x' = (x + kinokoWidth `div` 2) - screenWidth `div` 2
-		y' = (y + kinokoHeight `div` 2) - screenHeight `div` 2
-		x'' = min (sceneWidth - w) $ max x' 0
-		y'' = min (sceneHeight - h) $ max y' 0
+    where
+        x' = (x + kinokoWidth `div` 2) - screenWidth `div` 2
+        y' = (y + kinokoHeight `div` 2) - screenHeight `div` 2
+        x'' = min (sceneWidth - w) $ max x' 0
+        y'' = min (sceneHeight - h) $ max y' 0
 
 
