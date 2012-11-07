@@ -25,12 +25,6 @@ import Timer
 import Kinoko
 
 
-foreign import ccall unsafe "SDL_GetKeyState" sdlGetKeyState :: Ptr CInt -> IO (Ptr Word8)
-getKeyState :: IO [SDLKey]
-getKeyState = alloca $ \numkeysPtr -> do
-  keysPtr <- sdlGetKeyState numkeysPtr
-  numkeys <- peek numkeysPtr
-  (map Graphics.UI.SDL.Utilities.toEnum . map fromIntegral . findIndices (== 1)) `fmap` peekArray (fromIntegral numkeys) keysPtr
 
 
 
@@ -120,6 +114,11 @@ runLoop :: [SDLKey] -> AppConfig -> AppData -> IO ()
 runLoop ks = evalStateT . runReaderT (loop ks)
 
 main = withInit [InitEverything] $ do -- withInit calls quit for us.
+<<<<<<< HEAD
     (env, state) <- initEnv
     ks <- getKeyState
     runLoop ks env state
+=======
+	(env, state) <- initEnv
+	runLoop env state
+>>>>>>> fd0a9d6a58533181ebda3bbefcdc746cde9499ee
