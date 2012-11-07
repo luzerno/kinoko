@@ -9,6 +9,7 @@ import Control.Monad.State
 import Control.Monad.Reader
 import Game
 import Timer
+import Const
 
 loadImage :: String -> Maybe (Word8, Word8, Word8) -> IO Surface
 loadImage filename colorKey = load filename >>= displayFormat >>= setColorKey' colorKey
@@ -48,3 +49,14 @@ getScreen = liftM screen ask
 
 getKinokoSprite :: MonadReader AppConfig m => m Surface
 getKinokoSprite = liftM kinokoSprite ask
+
+
+setCamera :: Kinoko -> Camera -> Camera
+setCamera Kinoko {pos = P2 x y} rect@(Rect _ _ w h) = rect {rectX = x'', rectY = y''}
+	where
+		x' = (x + kinokoWidth `div` 2) - screenWidth `div` 2
+		y' = (y + kinokoHeight `div` 2) - screenHeight `div` 2
+		x'' = min (sceneWidth - w) $ max x' 0
+		y'' = min (sceneHeight - h) $ max y' 0
+
+

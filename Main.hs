@@ -17,6 +17,16 @@ import Timer
 import Kinoko
 
 
+foreign import ccall unsafe "SDL_GetKeyState" sdlGetKeyState :: Ptr CInt -> IO (Ptr Word8)
+getKeyState :: IO [SDLKey]
+getKeyState = alloca $ \numkeysPtr -> do
+  keysPtr <- sdlGetKeyState numkeysPtr
+  numkeys <- peek numkeysPtr
+  (map Graphics.UI.SDL.Utilities.toEnum . map fromIntegral . findIndices (== 1)) `fmap` peekArray (fromIntegral numkeys) keysPtr
+
+
+
+
 handleInput :: Event -> Kinoko -> Kinoko
 handleInput (KeyDown (Keysym SDLK_LEFT _ _)) n@Kinoko {velocity = velocity} = n {velocity = velocity - dotAccel}
 handleInput (KeyDown (Keysym SDLK_RIGHT _ _)) n@Kinoko {velocity = velocity} = n {velocity = velocity + dotAccel}
@@ -36,8 +46,11 @@ initEnv = do
 	setCaption "Kinoko Test" []
 	kinoko <- loadImage "nikki.png" (Just (0xff, 0xff, 0xff))
 	fps <- start defaultTimer
-	return (AppConfig screen kinoko, AppData walk fps)
+	return (AppConfig screen kinoko, AppData walk camera fps)
    where walk = defaultKinoko
+         camera = Rect 0 0 screenWidth screenHeight
+
+
 
 loop :: AppEnv ()
 loop = do
