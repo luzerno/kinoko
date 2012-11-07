@@ -17,12 +17,6 @@ import Timer
 import Kinoko
 
 
-foreign import ccall unsafe "SDL_GetKeyState" sdlGetKeyState :: Ptr CInt -> IO (Ptr Word8)
-getKeyState :: IO [SDLKey]
-getKeyState = alloca $ \numkeysPtr -> do
-  keysPtr <- sdlGetKeyState numkeysPtr
-  numkeys <- peek numkeysPtr
-  (map Graphics.UI.SDL.Utilities.toEnum . map fromIntegral . findIndices (== 1)) `fmap` peekArray (fromIntegral numkeys) keysPtr
 
 
 
