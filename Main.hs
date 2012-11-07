@@ -3,12 +3,20 @@
 module Main where
 import Data.Word
 import Data.Array.IArray
+import Data.List
 
 import Control.Monad.State
 import Control.Monad.Reader
 
 import Graphics.UI.SDL
 import Graphics.UI.SDL.Image
+import Graphics.UI.SDL.Utilities
+
+import Foreign
+import Foreign.C.Types
+import Foreign.Ptr
+import Foreign.Marshal.Alloc
+import Foreign.Marshal.Array
 
 import Util
 import Const
@@ -28,14 +36,21 @@ getKeyState = alloca $ \numkeysPtr -> do
 
 
 handleInput :: Event -> Kinoko -> Kinoko
-handleInput (KeyDown (Keysym SDLK_LEFT _ _)) n@Kinoko {velocity = velocity} = n {velocity = velocity - dotAccel}
-handleInput (KeyDown (Keysym SDLK_RIGHT _ _)) n@Kinoko {velocity = velocity} = n {velocity = velocity + dotAccel}
-handleInput (KeyUp (Keysym SDLK_LEFT _ _)) n@Kinoko {velocity = velocity} = n {velocity = velocity + dotAccel}
-handleInput (KeyUp (Keysym SDLK_RIGHT _ _)) n@Kinoko {velocity = velocity} = n {velocity = velocity - dotAccel}
+
+-- walk
+handleInput (KeyDown (Keysym SDLK_LEFT _ _)) n@Kinoko {velocity = velocity} = n {velocity = velocity - walkAccel}
+handleInput (KeyDown (Keysym SDLK_RIGHT _ _)) n@Kinoko {velocity = velocity} = n {velocity = velocity + walkAccel}
+handleInput (KeyUp (Keysym SDLK_LEFT _ _)) n@Kinoko {velocity = velocity} = n {velocity = velocity + walkAccel}
+handleInput (KeyUp (Keysym SDLK_RIGHT _ _)) n@Kinoko {velocity = velocity} = n {velocity = velocity - walkAccel}
+-- jump
+handleInput (KeyDown (Keysym SDLK_UP _ _)) n@Kinoko {velocity = velocity, stand = stand} = 
+										if stand 
+											then n {velocity = velocity - jumpAccel, stand = False}
+											else n {velocity = velocity}
+--handleInput (KeyUp (Keysym SDLK_UP _ _)) n@Kinoko {velocity = velocity} = n {velocity = velocity - jumpAccel}
+handleInput (KeyDown (Keysym SDLK_DOWN _ _)) n@Kinoko {velocity = velocity} = n {velocity = velocity - jumpAccel}
+handleInput (KeyUp (Keysym SDLK_DOWN _ _)) n@Kinoko {velocity = velocity} = n {velocity = velocity + jumpAccel}
 handleInput _ d = d
-
-
-
 
 
 
@@ -52,8 +67,8 @@ initEnv = do
 
 
 
-loop :: AppEnv ()
-loop = do
+loop :: [SDLKey] -> AppEnv ()
+loop ks = do
 	modifyFPSM $ liftIO . start
 	quit <- whileEvents $ modifyKinoko . handleInput
 	modifyKinoko $ updateKinoko . move
@@ -75,7 +90,7 @@ loop = do
 		when (ticks < secsPerFrame) $ do
 			delay $ secsPerFrame - ticks
 
-	unless quit loop
+	unless quit $ loop ks
    where
 	mapRGB' = mapRGB . surfaceGetPixelFormat
 	clipsRight = listArray (0, 2) [Rect 0 0 kinokoWidth kinokoHeight, Rect kinokoWidth 0 kinokoWidth kinokoHeight,
@@ -94,9 +109,10 @@ whileEvents act = do
 			act event
 			whileEvents act
 
-runLoop :: AppConfig -> AppData -> IO ()
-runLoop = evalStateT . runReaderT loop
+runLoop :: [SDLKey] -> AppConfig -> AppData -> IO ()
+runLoop ks = evalStateT . runReaderT (loop ks)
 
 main = withInit [InitEverything] $ do -- withInit calls quit for us.
 	(env, state) <- initEnv
-	runLoop env state
+	ks <- getKeyState
+	runLoop ks env state
