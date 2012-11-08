@@ -68,8 +68,8 @@ initEnv = do
 
 
 
-loop :: [SDLKey] -> AppEnv ()
-loop ks = do
+loop :: AppEnv ()
+loop = do
     modifyFPSM $ liftIO . start
     quit <- whileEvents $ modifyKinoko . handleInput
     modifyKinoko $ updateKinoko . jump . touchGround. move
@@ -91,7 +91,7 @@ loop ks = do
         when (ticks < secsPerFrame) $ do
             delay $ secsPerFrame - ticks
 
-    unless quit $ loop ks
+    unless quit loop
    where
     mapRGB' = mapRGB . surfaceGetPixelFormat
     clipsRight = listArray (0, 2) [Rect 0 0 kinokoWidth kinokoHeight, Rect kinokoWidth 0 kinokoWidth kinokoHeight,
@@ -110,15 +110,9 @@ whileEvents act = do
             act event
             whileEvents act
 
-runLoop :: [SDLKey] -> AppConfig -> AppData -> IO ()
-runLoop ks = evalStateT . runReaderT (loop ks)
+runLoop :: AppConfig -> AppData -> IO ()
+runLoop = evalStateT . runReaderT loop 
 
 main = withInit [InitEverything] $ do -- withInit calls quit for us.
-<<<<<<< HEAD
     (env, state) <- initEnv
-    ks <- getKeyState
-    runLoop ks env state
-=======
-	(env, state) <- initEnv
-	runLoop env state
->>>>>>> fd0a9d6a58533181ebda3bbefcdc746cde9499ee
+    runLoop env state
