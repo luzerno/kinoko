@@ -17,6 +17,10 @@ getX :: P2 -> Int
 getX (P2 x _) = x
 getY :: P2 -> Int
 getY (P2 _ y) = y
+setX :: Int -> P2 -> P2
+setX x p2 = P2 x $ getY p2
+setY :: Int -> P2 -> P2
+setY y p2 = P2 (getX p2) y
 screenWidth     = 800 :: Int
 screenHeight    = 600 :: Int
 screenBpp       = 32  :: Int

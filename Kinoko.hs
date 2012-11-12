@@ -9,11 +9,18 @@ import Game
 -- move kinoko, check if in the screen. Collision detection should be here
 move :: Kinoko -> Kinoko
 move n@Kinoko {pos = pos, velocity = velocity, stand = stand} 
-    = n {pos = pos''} where
-        pos' = pos + velocity
+    = n {pos = pos'', velocity = velocity'} where
+        velocity' = if getX (pos + velocity) < 0 || getX (pos + velocity) + kinokoWidth > screenWidth
+                        then setX 0 velocity -- check y axis???
+                        else velocity
+        pos' = pos + velocity'
         pos'' = if getX pos' < 0 || getX pos' + kinokoWidth > screenWidth || getY pos' < 0 || getY pos' + kinokoHeight > screenHeight 
                     then pos
-                    else pos'
+                    else pos' -- check y axis? 
+
+
+
+
 touchGround :: Kinoko -> Kinoko
 touchGround n@Kinoko {pos = pos, velocity = velocity, stand = stand}
     = n {velocity = velocity', stand = stand'} where
