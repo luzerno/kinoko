@@ -1,0 +1,43 @@
+START :
+    position (9,9)
+    stand
+    on hitblock stop
+    on signal = red jump1
+    on hitsignal jump1
+
+     
+walkRigh3 :
+    velocity (2,2)
+    acceleration (33,2)
+    on hitblock stop
+    on step = 9 jump
+jumpLe5 : 
+    velocity (2,2)
+    acceleration (33,2)
+    on hitblock stop
+    on step = 9 jump
+stop2 :
+stop3 :
+   on fall jumpLef
+jumpeft9 :
+    jumplefthigh
+    on fall stop2
+
+
+jumpight2 :
+    jumprightlow
+    on hitground jumplft8
+
+
+walk5 :
+    walkrightfast
+
+
+walk6 :
+    walkleftslow
+    on fall walk5
+
+
+jumpp8 :
+    jumpuplow
+    on fall walk6
