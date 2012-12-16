@@ -76,7 +76,18 @@ type AEnv = [(ID, Actor)]
 type Env = (AEnv, Int)
 
 
-data GameEvent = EvHitblock | EvStep Int | EvHitground | EvFall | EvHitbonus | EvHitsignal | EvSignal SignalColor
+data GameEvent = EvHitblock 
+               | EvStep Int 
+               | EvHitground 
+               | EvFall 
+               | EvHitbonus 
+               | EvHitsignal 
+               | EvSignal SignalColor
+               | EvKeyLeft
+               | EvKeyRight
+               | EvKeyUp
+               | EvKeyUpLeft
+               | EvKeyUpRight 
 		deriving (Eq, Show)
 
 data SignalColor = Red | Yellow | Green

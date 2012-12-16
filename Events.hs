@@ -9,7 +9,9 @@ hitP2 (P2 x1 y1, (w1, h1)) (P2 x2 y2, (w2, h2)) =
 
 hitTopP2 :: (P2, (Double, Double)) -> (P2, (Double, Double)) -> Bool
 hitTopP2 (P2 x1 y1, (w1, h1)) (P2 x2 y2, (w2, h2)) =
-	let 
+	if y1 > y2 
+		then False
+		else let
 		xmin = min x1 x2
 		xmax = max (x1 + w1) (x2 + w2)
 		ymin = min y1 y2

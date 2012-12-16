@@ -4,10 +4,15 @@ import Control.Monad
 import Data.List
 import Data.Maybe
 import Data.IORef
+import Foreign hiding (unsafePerformIO)
+import Foreign.C.Types
+import System.IO.Unsafe (unsafePerformIO)
+
 import Graphics.UI.SDL hiding (Event)
 import Graphics.UI.SDL.Image
 import Graphics.UI.SDL.Rotozoomer
 import Graphics.UI.SDL.TTF
+import Graphics.UI.SDL.Utilities as Util
 import Data.Word (Word32, Word8)
 
 import Const
@@ -463,21 +468,40 @@ checkHitBonus trg = if isNothing $ hitBonusS trg
 						then []
 						else [EvHitbonus]
 
-animate :: States -> StateT Env IO () -> StateT Env IO ()
-animate states initEnv = do
+foreign import ccall unsafe "SDL_GetKeyState" sdlGetKeyState :: Ptr CInt -> IO (Ptr Word8)
+
+type KeyProc = SDLKey -> Bool
+-- this function comes from mokehehe's super nario bros: http://github.com/mokehehe/monao in the file "AppUtil.hs"
+getKeyState :: IO KeyProc
+getKeyState = alloca $ \numkeysPtr -> do
+    keysPtr <- sdlGetKeyState numkeysPtr
+    return $ \k -> (/= 0) $ unsafePerformIO $ (peekByteOff keysPtr $ fromIntegral $ Util.fromEnum k :: IO Word8)
+
+initAnime :: StateT Env IO () -> StateT Env IO (Surface, Font, Word32, Int)
+initAnime initEnv = do
 	liftIO TTFG.init
 	screen <- liftIO $ getScreen
 	font <- liftIO $ openFont fontName fontSize
 	initEnv
 	t0 <- liftIO getTicks
 	bonusNumber <- getBonusNumber
+	return (screen, font, t0, bonusNumber)
+
+animate :: States -> StateT Env IO () -> StateT Env IO ()
+animate states initEnv = do
+
+	(screen, font, t0, bonusNumber) <- initAnime initEnv
 
 	let runit curState = do
 		t <- liftIO getTicks
+		sdlEvent <- liftIO pollEvent
+		case sdlEvent of
+			_ -> return ()
+
 		let ft = fromIntegral (fromIntegral (t - t0)) / 1000
 		trg <- run (ft, Nothing, ([], 0)) -- what??
 		let playerEvents = getPlayerEventsFromTriggers trg
-		liftIO $ print playerEvents
+		--liftIO $ print playerEvents
 		player <- getPlayerActor
 		draw screen font player bonusNumber
 		let nextState = getNextState curState playerEvents states
@@ -496,7 +520,7 @@ animate states initEnv = do
 		if (t2 - t) < msPerTick
 			then lift $ delay (msPerTick - t2 + t)
 			else return ()
-		liftIO $ putStrLn $ "TIME::::::::::: " ++ show (t2 - t)
+		--liftIO $ putStrLn $ "TIME::::::::::: " ++ show (t2 - t)
 		runit next
 
 	let startState = getPlayerStateByName "start" states
@@ -504,6 +528,73 @@ animate states initEnv = do
 	setMaybeMotion ident (startPos startState) (moveVelocity startState) (moveAccel startState)
 	runit $ startState 
 
+getKeyboardEvent :: IO [GameEvent]
+getKeyboardEvent = do
+	keyState <- liftIO getKeyState
+	let keyLeft = keyState SDLK_LEFT
+	let keyRight = keyState SDLK_RIGHT
+	let keyUp = keyState SDLK_UP	
+	if keyLeft && not keyUp
+		then return [EvKeyLeft]
+		else if keyRight && not keyUp
+			then return [EvKeyRight]
+			else if keyUp && not keyLeft && not keyRight
+				then return [EvKeyUp]
+				else if keyUp && keyLeft && not keyRight
+					then return [EvKeyUpLeft]
+					else if keyUp && keyRight && not keyLeft
+						then return [EvKeyUpRight]
+						else return []
+
+
+animateKeyboard :: StateT Env IO () -> StateT Env IO ()
+animateKeyboard initEnv = do
+
+	(screen, font, t0, bonusNumber) <- initAnime initEnv
+
+	let runit curState = do
+		t <- liftIO getTicks
+		quit <- do
+			sdlEvent <- liftIO pollEvent
+			if sdlEvent == Quit 
+				then return True
+				else return False
+		when (not quit) $ do	
+			let ft = fromIntegral (fromIntegral (t - t0)) / 1000
+			trg <- run (ft, Nothing, ([], 0)) -- what??
+			keyEvents <- liftIO getKeyboardEvent
+			let playerEvents = getPlayerEventsFromTriggers trg ++ 
+				if stateName curState == "start" 
+					then keyEvents
+					else []
+
+			player <- getPlayerActor
+			draw screen font player bonusNumber
+			let nextState = getNextState curState playerEvents keyBoardStates
+			next <- if isNothing nextState
+				then do
+					--liftIO $ putStrLn "stay state"
+					return curState
+				else do
+					--liftIO $ putStrLn "new State"
+					let next = fromJust nextState
+					ident <- getPlayerId
+					resetStep ident
+					setMaybeMotion ident (startPos next) (moveVelocity next) (moveAccel next)
+					return next
+			t2 <- liftIO getTicks
+			if (t2 - t) < msPerTick
+				then lift $ delay (msPerTick - t2 + t)
+				else return ()
+			--liftIO $ putStrLn $ "TIME::::::::::: " ++ show (t2 - t)
+			runit next
+
+	let startState = getPlayerStateByName "start" keyBoardStates
+	ident <- getPlayerId
+	setMaybeMotion ident (startPos startState) (moveVelocity startState) (moveAccel startState)
+	runit $ startState 
+	liftIO $ putStrLn "quit"
+	liftIO TTFG.quit
 
 
 getActorNumber :: State Env () -> Env -> Int
@@ -662,83 +753,87 @@ setting12 = do
 	newNikki 20 0
 	newBorders
 	return ()
---states :: States
---states = [PlayerState { stateName = "start", 
---						startPos = Just $ P2 30 0, 
---						moveVelocity = P2 140 0, 
---						moveAccel = P2 (-80) 0, 
---						transition = [
---							Transition {onevent = EvStep 700, 
---										toStateName = "stop"}]},
---		  PlayerState { stateName = "stop",
---		  				startPos = Nothing,
---		  				moveVelocity = P2 0 0,
---		  				moveAccel = P2 0 0,
---		  				transition = [
---		  					Transition {onevent = EvStep 0,
---		  							    toStateName = "jump"}]},
---		  PlayerState { stateName = "jump",
---		  				startPos = Nothing,
---		  				moveVelocity = P2 60 (-200),
---		  				moveAccel = P2 0 100,
---		  				transition = [
---		  					Transition {onevent = EvHitground,
---		  								toStateName = "walk"}]},
---		  PlayerState { stateName = "walk",
---						startPos = Nothing,
---						moveVelocity = P2 40 0,
---						moveAccel = P2 0 0,
---						transition = []}
-
-
---		  	]
-
---states2 = [PlayerState { stateName = "start",
---						 startPos = Just $ P2 30 0,
---						 moveVelocity = P2 (-40) (-150),
---						 moveAccel = P2 0 100,
---						 transition = []}]
-
---states3 = [PlayerState {stateName = "start",
---						startPos = Just $ P2 0 0,
---						moveVelocity = P2 0 0,
---						moveAccel = P2 0 0,
---						transition = [
---							Transition {onevent = EvStep 0, toStateName = "go"}
---						]},
---		   PlayerState {stateName = "go",
---						startPos = Nothing,
---						moveVelocity = P2 100 0,
---						moveAccel = P2 0 0,
---						transition = [
---							Transition {onevent = EvHitblock, toStateName = "back"}
---						]},
---		   PlayerState {stateName = "back",
---		  				startPos = Nothing,
---		  				moveVelocity = P2 (-100) 0,
---		  				moveAccel = P2 0 0,
---		  				transition = [
---		  					Transition {onevent = EvHitblock, toStateName = "go"}
---		  				]}]
-
---states4 = [PlayerState { stateName = "start",
---						 startPos = Just $ P2 30 0,
---						 moveVelocity = P2 (40) (0),
---						 moveAccel = P2 0 0,
---						 transition = [
---						 	Transition {onevent = EvHitsignal,
---						 				toStateName = "stop"}
---						 ]},
---		  PlayerState { stateName = "stop",
---						startPos = Nothing,
---						moveVelocity = P2 0 0,
---						moveAccel = P2 0 0,
---						transition = [
---							Transition {onevent = EvSignal Red,
---										toStateName = "walk"}]},
---		  PlayerState { stateName = "walk",
---						startPos = Nothing,
---						moveVelocity = P2 (100) 0,
---						moveAccel = P2 0 0,
---						transition = []}
---			]
+keyBoardStates :: States
+keyBoardStates = [
+	PlayerState {
+		stateName = "left",
+		startPos = Nothing,
+		moveVelocity = P2 (-100) 0,
+		moveAccel = P2 0 0,
+		transition = [
+			Transition {onevent = EvStep 40,
+						toStateName = "start"},
+			Transition {onevent = EvHitground,
+						toStateName = "start"},
+			Transition {onevent = EvHitblock,
+						toStateName = "start"}
+		]
+	},
+	PlayerState {
+		stateName = "right",
+		startPos = Nothing,
+		moveVelocity = P2 100 0,
+		moveAccel = P2 0 0,
+		transition = [
+			Transition {onevent = EvStep 40,
+						toStateName = "start"},
+			Transition {onevent = EvHitground,
+						toStateName = "start"},
+			Transition {onevent = EvHitblock,
+						toStateName = "start"}
+		]	
+	},
+	PlayerState {
+		stateName = "jumpUp",
+		startPos = Nothing,
+		moveVelocity = P2 0 (-150),
+		moveAccel = P2 0 100,
+		transition = [
+			Transition {onevent = EvHitground,
+						toStateName = "start"},
+			Transition {onevent = EvHitblock,
+						toStateName = "start"}
+		]
+	},
+	PlayerState {
+		stateName = "jumpLeft",
+		startPos = Nothing,
+		moveVelocity = P2 (-40) (-150),
+		moveAccel = P2 0 100,
+		transition = [
+			Transition {onevent = EvHitground,
+						toStateName = "start"},
+			Transition {onevent = EvHitblock,
+						toStateName = "start"}
+		]
+	},
+	PlayerState {
+		stateName = "jumpRight",
+		startPos = Nothing,
+		moveVelocity = P2 40 (-150),
+		moveAccel = P2 0 100,
+		transition = [
+			Transition {onevent = EvHitground,
+						toStateName = "start"},
+			Transition {onevent = EvHitblock,
+						toStateName = "start"}
+		]
+	},
+	PlayerState {
+		stateName = "start",
+		startPos = Nothing,
+		moveVelocity = P2 0 0,
+		moveAccel = P2 0 100,
+		transition = [
+			Transition {onevent = EvKeyLeft,
+						toStateName = "left"},
+			Transition {onevent = EvKeyRight,
+						toStateName = "right"},
+			Transition {onevent = EvKeyUp,
+						toStateName = "jumpUp"},
+			Transition {onevent = EvKeyUpLeft,
+						toStateName = "jumpLeft"},
+			Transition {onevent = EvKeyUpRight,
+						toStateName = "jumpRight"}
+		]	
+	} ]
