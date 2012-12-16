@@ -44,6 +44,7 @@ t2 = processFile (Just "scripts/bounce.src") setting2
 t3 = processFile (Just "scripts/climbup.src") setting3
 t4 = processFile (Just "scripts/jumptoblock.src") setting4
 t5 = processFile (Just "scripts/signal.src") setting5
+t6 = processFile (Just "scripts/test6.src") setting6
 
 t00 = processFile (Just "scripts/script11.src") setting11
 t01 = processFile (Just "scripts/script12.src") setting12

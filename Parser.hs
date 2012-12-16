@@ -10,20 +10,18 @@ type Parser = Parsec [Token] ()
 parsT = parse program "?" tok
     where Right tok = parse lexer "?" "start :\n jumpleftlow\n on hitground walk"
 
-{--
- "walk :\n positiond(9,9)\n velocity(8,8)\n acceleration(7,7)\n on hitblock walk"
- "jump :\n position(9,9)\n velocity(8,8)\n acceleration(7,7)\n on hitblock walk"
- "start :\n position(9,9)\n velocity(8,8)\n acceleration(7,7)\n on hitblock walk"
- "stop :\n on step = 9 walk"
---}
 
 program :: Parser Program
-program = do a <- (many stmt)
-             return a
+program = many stmt
 
 stmt :: Parser Statement
-stmt = do a <- try (walkStmt) <|> try (startStmt) <|> try (jumpStmt) <|> try (stopStmt)
-          return a
+stmt = do a <- name
+          b <- colon
+          c <- pPara
+          trans <- pTrans
+          k <- endStmt
+          let (Input pos velo acc) = c
+          return $ Statement a pos velo acc trans
 
 
 coordinate = do a <- oParen
@@ -35,88 +33,59 @@ coordinate = do a <- oParen
 
 {-- parse event---}
 pEvent :: Parser GameEvent
-pEvent = do a <- try (pEvHit) <|> try (pEvStep) <|> try (pEvHitground) <|> try (pEvFall) <|> try (pEvHitbonus) <|> try (pEvHitsignal) <|> (pEvSignal)
-            return a
+pEvent = try (pEvHit) <|> try (pEvStep) <|> try (pEvHitground) <|> try (pEvFall) <|> try (pEvHitbonus) <|> try (pEvHitsignal) <|> (pEvSignal)
 pEvHitground :: Parser GameEvent
-pEvHitground = do  a <- pHitground
+pEvHitground = do  pHitground
                    return EvHitground
 pEvFall :: Parser GameEvent
-pEvFall = do  a <- pFall
+pEvFall = do  pFall
               return EvFall
 pEvHitsignal :: Parser GameEvent
-pEvHitsignal = do a <- pHitsignal
+pEvHitsignal = do pHitsignal
                   return EvHitsignal
 
 pEvHitbonus :: Parser GameEvent
-pEvHitbonus = do a <- pHitbonus
+pEvHitbonus = do pHitbonus
                  return EvHitbonus
 
 pEvSignal :: Parser GameEvent
-pEvSignal = do a <- pSignal
-               b <- equ
+pEvSignal = do pSignal
+               equ
                c <- pInGreen <|> pInRed <|> pInYellow
                return $ EvSignal c
 
 pInRed :: Parser SignalColor
-pInRed = do a <- pRed
+pInRed = do pRed
             return Red
 
 pInGreen :: Parser SignalColor
-pInGreen = do a <- pGreen
+pInGreen = do pGreen
               return Green
 
 pInYellow :: Parser SignalColor
-pInYellow = do a <- pYellow
+pInYellow = do pYellow
                return Yellow
 
 pEvHit :: Parser GameEvent
-pEvHit = do a <- pHitblock
+pEvHit = do pHitblock
             return EvHitblock
 
 pEvStep :: Parser GameEvent
-pEvStep = do a <- pStep
-             b <- equ
+pEvStep = do pStep
+             equ
              c <- int
              return $ EvStep c
-{----parse event end---}
-
-
-{--
-pNextStatement :: Parser Token
-pNextStatement = do a <- try (pWalk) <|> try (pJump) <|> try (pStop) 
-                    return a
---}
 
 pNextStatement :: Parser String
-pNextStatement = do a <- name
-                    return a
+pNextStatement = name
 
 pTransOne = do a <- pOn
                b <- pEvent
                c <- pNextStatement
                return $ Trans b c
 
-pTrans = do a <- many pTransOne
-            return a
-{-
-pWithPos = do a <- pPosition
-              pos <- coordinate
-              d <- pVelo
-              velo <- coordinate
-              e <- pAcc
-              acc <- coordinate
-              trans <- pTrans
-              k <- endStmt
-              return $ pos velo acc trans
+pTrans = many pTransOne
 
-pWithoutPos = do a <- pVelo
-                 velo <- coordinate
-                 e <- pAcc
-                 acc <- coordinate
-                 trans <- pTrans
-                 k <- endStmt
-                 return $ (-1,-1) velo acc trans
--}
 pPos = do a <- pPosition
           b <- coordinate
           return b
@@ -130,16 +99,14 @@ pInput = do  pos <- option (-1,-1) pPos
              return $ Input pos velo acc
 
 pAuto :: Parser Input
-pAuto = do a <- try (pInWalkRight) <|> try (pInWalkRightSlow) <|> try (pInWalkRightFast)
+pAuto = try (pInWalkRight) <|> try (pInWalkRightSlow) <|> try (pInWalkRightFast)
              <|>try (pInWalkLeft)  <|> try (pInWalkLeftSlow)  <|> try (pInWalkLeftFast)
              <|>try (pInJumpUp)    <|> try (pInJumpUpLow)     <|> try (pInJumpUpHigh)
              <|>try (pInJumpRight) <|> try (pInJumpRightLow)  <|> try (pInJumpRightHigh)
              <|>try (pInJumpLeft)  <|> try (pInJumpLeftLow)   <|> try (pInJumpLeftHigh)
              <|>try (pInStand)
-           return a
  
-pPara = do a <- try (pInput) <|> try (pAuto)
-           return a
+pPara = try (pInput) <|> try (pAuto)
 
 pInWalkRight = do b <- option (-1,-1) pPos
                   a <- pWalkRight
@@ -205,90 +172,3 @@ pInStand = do b <- option (-1,-1) pPos
               a <- pStand
               return $ Input b (0,0) (0,0)
 
-{--
-walkStmt :: Parser Statement
-walkStmt = do a <- pWalk
-              b <- colon
-              c <- try (pWithPos) <|> try (pWithoutPos)
-              return $ Walk c
-
-walkStmt = do a <- name
-              b <- colon
-              pos <- option (-1,-1) pPos
-              d <- pVelo
-              velo <- coordinate
-              e <- pAcc
-              acc <- coordinate
-              trans <- pTrans
-              k <- endStmt
-              return $ Statement a pos velo acc trans
---}
-
-
-walkStmt :: Parser Statement
-walkStmt = do a <- name
-              b <- colon
-              c <- pPara
-              trans <- pTrans
-              k <- endStmt
-              let (Input pos velo acc) = c
-              return $ Statement a pos velo acc trans
-
-
-startStmt :: Parser Statement
-startStmt = do a <- name
-               b <- colon
-               c <- pPara
-               trans <- pTrans
-               k <- endStmt
-               let (Input pos velo acc) = c
-               return $ Statement a pos velo acc trans
-jumpStmt :: Parser Statement
-jumpStmt = do a <- name
-              b <- colon
-              c <- pPara
-              trans <- pTrans
-              k <- endStmt
-              let (Input pos velo acc) = c
-              return $ Statement a pos velo acc trans
-{--
-walkStmt :: Parser Statement
-walkStmt = do a <- name
-              b <- colon
-              c <- pPara
-              trans <- pTrans
-              k <- endStmt
-              let Input parameter = c
-              return $ Statement a parameter trans
-
-
-startStmt = do a <- name
-               b <- colon
-               c <- pPosition
-               pos <- coordinate
-               d <- pVelo
-               velo <- coordinate
-               e <- pAcc
-               acc <- coordinate
-               trans <- pTrans
-               k <- endStmt
-               return $ Statement a pos velo acc trans
-
-
-jumpStmt =  do a <- name
-               b <- colon
-               pos <- option (-1,-1) pPos
-               d <- pVelo
-               velo <- coordinate
-               e <- pAcc
-               acc <- coordinate
-               trans <- pTrans
-               k <- endStmt
-               return $ Statement a pos velo acc trans
---}
-
-stopStmt = do a <- name
-              b <- colon
-              trans <- pTrans
-              k <- endStmt
-              return $ Statement a (-1,-1) (-1,-1) (-1,-1) trans

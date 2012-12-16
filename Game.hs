@@ -3,7 +3,6 @@ import Control.Monad.State
 import Control.Monad
 import Data.List
 import Data.Maybe
-import Data.IORef
 import Foreign hiding (unsafePerformIO)
 import Foreign.C.Types
 import System.IO.Unsafe (unsafePerformIO)
@@ -742,6 +741,49 @@ setting5 = do
 	newStar 876 66
 	newBorders
 	return ()
+setting6 :: StateT Env IO ()
+setting6 = do
+	newNikki 20 0
+
+	newBox 150 120
+	newBox 215 120
+
+	newBox 150 380
+	newBox 215 380
+
+	newBox 450 250
+	newBox 515 250
+
+
+	newStar 215 188
+	newStar 215 446
+	newStar 515 316
+
+	newSignal 650 0
+
+	newBox 800 0
+	newBox 800 66
+	newBox 800 132
+
+	newStar 800 198
+
+	newBox 1000 132
+	newBox 1000 198
+	newBox 1000 264
+
+	newStar 1000 330
+
+	newBox 1200 0
+	newBox 1200 66
+	newBox 1200 132
+
+	newStar 1200 198
+
+	newBorders
+	
+	return ()
+
+
 
 setting11 :: StateT Env IO ()
 setting11 = do 

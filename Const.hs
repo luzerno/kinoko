@@ -18,3 +18,4 @@ pointPosX = 650 ::  Int
 pointPosY = 20 :: Int
 fontSize = 20 :: Int
 fontName = "font/Inconsolata.ttf"
+

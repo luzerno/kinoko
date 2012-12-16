@@ -1,0 +1,40 @@
+START :
+    position (0,0)
+    stand
+    on Step = 0 RIGHTJ1
+RIGHTJ1 :
+    jumpRightHigh
+    on HitGround RIGHTW1
+RIGHTW1 :
+    walkRightFast
+    on Step = 70 RIGHTJ2
+RIGHTJ2 :
+    jumpRightHigh
+    on HitGround RIGHTW2
+RIGHTW2 :
+    walkRightFast
+    on Step = 30 LEFTW1
+LEFTW1 :
+    walkLeftFast
+    on Step = 30 LEFTJ1
+LEFTJ1 :
+    jumpLeftHigh
+    on HitGround RIGHTJ3
+RIGHTJ3 :
+    jumpRightHigh
+    on HitGround RIGHTW3
+RIGHTW3 :
+    walkRightFast
+    on Step = 50 RIGHTJ4
+RIGHTJ4 :
+    jumpRightHigh    
+    on HitGround RIGHTW4
+RIGHTW4 :
+    walkRightFast
+    on Step = 40 RIGHTJ5
+RIGHTJ5 :
+    jumpRightHigh
+    on HitGround RIGHTW5
+RIGHTW5 :
+    walkRightFast
+    
