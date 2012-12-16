@@ -19,7 +19,6 @@ data Trigger = Trigger {
   hitGroundS :: Maybe Double,
 	fallT :: Event (),
 	fallS :: Maybe ()
-
 }
 data Actor = Actor { 
 	position :: Behavior P2,

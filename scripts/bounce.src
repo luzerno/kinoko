@@ -1,0 +1,9 @@
+START:
+    stand
+    on Step = 0 RIGHT
+RIGHT:
+    walkRight
+    on HitBlock LEFT
+LEFT:
+    walkLeft
+    on HitBlock RIGHT

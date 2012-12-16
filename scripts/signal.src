@@ -1,0 +1,49 @@
+START :
+    stand
+    on step = 0 RIGHT1
+RIGHT1 :
+    walkRightFast
+    on hitsignal PAUSE
+    on hitblock LEFT1
+
+PAUSE :
+    stand
+    on Signal = red RIGHT2
+
+RIGHT2 : 
+    walkRightFast
+    on HitBlock BACKL
+
+BACKL :
+    walkLeftFast
+    on Step = 30 JUMPR
+
+JUMPR :
+    jumpRight
+    on HitGround RIGHT3
+
+RIGHT3 :
+    walkRightSlow
+    on HitGround RIGHT1
+
+LEFT1 :
+    walkLeftFast
+    on HitBlock BACKR
+BACKR :
+    walkRightFast
+    on Step = 30 JUMPL
+JUMPL :
+    jumpLeft
+    on HitGround LEFT2
+LEFT2 :
+    walkLeftSlow
+    on HitGround LEFT3
+LEFT3 :
+    walkLeftFast
+    on HitSignal PAUSE2
+PAUSE2 :
+    stand
+    on Signal = green LEFT4
+LEFT4 :
+    walkLeftFast
+    on HitBlock RIGHT1

@@ -10,14 +10,11 @@ import Graphics.UI.SDL.Rotozoomer
 import Graphics.UI.SDL.TTF
 import Data.Word (Word32, Word8)
 
-import Control.Monad.Reader
-import qualified Graphics.UI.GLFW as GLFW
-import qualified Graphics.Rendering.OpenGL as GL
 import Const
 import GameTypes
 import Events
+import Graphic
 import qualified Graphics.UI.SDL.TTF.General as TTFG
-
 
 never :: Event a
 never = Event (\s -> return (never, Nothing))
@@ -122,6 +119,16 @@ setPosition ident b = do
 			let newActor = (fst a, (snd a) {position = b})
 			put (newActor : otherActors, cnt)
 
+setPositionSVelocityS :: ID -> P2 -> P2 -> StateT Env IO ()
+setPositionSVelocityS ident p v = do
+	(actors, cnt) <- get
+	let (actor, otherActors) = partition (\x -> fst x == ident) actors
+	unless (length actor /= 1) $
+		do 
+			let a = head actor
+			let newActor = (fst a, (snd a) {positionS = p, velocityS = v})
+			put (newActor : otherActors, cnt)
+
 setAccel :: ID -> P2 -> StateT Env IO ()
 setAccel ident accel = do
 	(actors, cnt) <- get
@@ -143,6 +150,7 @@ setMotion ident pos0 vel0 accel = do
 	setAccel ident accel
 	setVelocity ident velocityB
 	setPosition ident positionB
+	setPositionSVelocityS ident pos0 vel0
 
 addPoint :: ID -> StateT Env IO ()
 addPoint ident = do
@@ -245,7 +253,8 @@ liftState fn (a : as) = do
 	bs <- liftState fn as
 	return (b : bs)
 
-
+getBonusNumber :: StateT Env IO Int
+getBonusNumber = fmap length $ idsWithLabel Bonus
 
 
 getNewActorPosition :: Stimulus -> Actor -> StateT Env IO Actor
@@ -341,6 +350,7 @@ handleActorEvent ((ident, actor) : xs) = do
 			unless (isNothing $ hitGroundS trg) $ do
 				let posY = (fromJust $ hitGroundS trg) - height actor
 				let P2 posX _ = positionS player
+				liftIO $ putStrLn $ "ground :::::" ++ (show $ fromJust $ hitGroundS trg)
 				setMotion ident (P2 posX posY) (P2 0 0) (P2 0 0)
 				return ()
 			unless (isNothing $ fallS trg) $ do
@@ -390,71 +400,8 @@ run s = do
 	--liftIO $ print $ map (isNothing . hitBlockS . triggers . snd) idActors
 	return playerCurrentEvents
 
-putActorsToScreen :: Surface -> [Actor] -> P2 -> IO ()
-putActorsToScreen screen [] _ = return ()
-putActorsToScreen screen (a:as) d = do 
-	when (length (image a) > 0) $ do
-		let (P2 x y) = positionS a + d
-		let dir = direction a
-		let P2 _ accelY = accel a
-		sur <- case (label a) of
-			Player -> do
-				let frame = ((stepS a) `div` 10) `mod` ((length $ surface a) - 1)
-				let (P2 _ accelY) = accel a
-				let sur = if accelY /= 0
-					then last $ surface a
-					else if velocityS a == P2 0 0 && accel a == P2 0 0 
-						then head $ surface a
-						else surface a !! frame
-				if direction a == RightDir
-					then return $ sur
-					else zoom sur (-1) (1) True
-			Signal -> do
-				let color = ((stepS a) `div` signalStep) `mod` (length $ surface a)
-				return $ surface a !! color
-			otherwise -> return $ head $ surface a
-		applySurface (round x) (round y) sur screen 
-		return ()
-	putActorsToScreen screen as d
-
-drawPoint :: Surface -> Font -> StateT Env IO ()
-drawPoint screen font = do
-	player <- getPlayerActor
-	liftIO $ putPointToScreen screen font $ point player
-
-putPointToScreen :: Surface -> Font -> Int -> IO ()
-putPointToScreen screen font p = do
-	message <- renderTextSolid font ("Points: " ++ (show p)) (Color 255 255 255)
-	applySurface pointPosX pointPosY message screen
-	return ()
 
 
-getPlayerScreenPosition :: P2 -> Double -> Double -> P2
-getPlayerScreenPosition (P2 px py) w h
-	| px <= playerScreenPosX = P2 px py
-	| px >= fromIntegral sceneWidth - fromIntegral screenWidth + playerScreenPosX = P2 (fromIntegral screenWidth - fromIntegral sceneWidth + px) py
-	| otherwise = P2 playerScreenPosX py
-
-drawActors :: Surface -> StateT Env IO ()
-drawActors screen = do
-	player <- getPlayerActor
-	(actors, cnt) <- get
-	let pos = positionS player
-	let newPos = getPlayerScreenPosition pos (width player) (height player)
-	let d = newPos - pos
-	liftIO $ putActorsToScreen screen (map snd actors) d
-
-draw :: Surface -> Font -> StateT Env IO ()
-draw screen font = do 
-		  rect <- liftIO $ getClipRect screen
-		  black <- liftIO $ mapRGB (surfaceGetPixelFormat screen) 0x00 0x00 0x00
-		  white <- liftIO $ mapRGB (surfaceGetPixelFormat screen) 0xFF 0xFF 0xFF
-		  liftIO $ fillRect screen (Just rect) black 
-		  drawActors screen
-		  drawPoint screen font
-		  liftIO $ Graphics.UI.SDL.flip screen
-		    --delay 1
-		  return ()
 
 getStepFromGameEvents :: [GameEvent] -> Int
 getStepFromGameEvents evs = foldl (\acc x -> acc + case x of
@@ -523,6 +470,7 @@ animate states initEnv = do
 	font <- liftIO $ openFont fontName fontSize
 	initEnv
 	t0 <- liftIO getTicks
+	bonusNumber <- getBonusNumber
 
 	let runit curState = do
 		t <- liftIO getTicks
@@ -530,7 +478,8 @@ animate states initEnv = do
 		trg <- run (ft, Nothing, ([], 0)) -- what??
 		let playerEvents = getPlayerEventsFromTriggers trg
 		liftIO $ print playerEvents
-		draw screen font
+		player <- getPlayerActor
+		draw screen font player bonusNumber
 		let nextState = getNextState curState playerEvents states
 		next <- if isNothing nextState
 			then do
@@ -561,31 +510,6 @@ getActorNumber :: State Env () -> Env -> Int
 getActorNumber proc st = length $ fst $ snd $ runState proc st
 
 
-getScreen :: IO Surface
-getScreen = do
-  screen <- setVideoMode screenWidth screenHeight screenBpp [SWSurface]
-  setCaption "Kinoko Test" []
-  return screen
-
-loadSingleImage :: Maybe (Word8, Word8, Word8) -> String -> IO Surface
-loadSingleImage colorKey filename = load filename >>= displayFormat >>= setColorKey' colorKey
-
-loadImages :: [String] -> IO [Surface]
-loadImages [] = return []
-loadImages (x : xs) = do
-			a <- loadSingleImage (Just backgroundColor) x
-			b <- loadImages xs
-			return (a : b)
-
-applySurface :: Int -> Int -> Surface -> Surface -> IO Bool
-applySurface x y src dst = blitSurface src Nothing dst offset
-  where offset = Just Rect {rectX = x, rectY = y, rectW = 0, rectH = 0} 
-
-setColorKey' Nothing s = return s
-setColorKey' (Just (r, g, b)) surface = (mapRGB . surfaceGetPixelFormat) surface r g b >>= setColorKey surface [SrcColorKey] >> return surface
-
-
-
 setMaybeMotion :: ID -> Maybe P2 -> P2 -> P2 -> StateT Env IO ()
 setMaybeMotion ident mpos0 vel0 accel = do
 	actor <- getActorById ident
@@ -595,9 +519,10 @@ setMaybeMotion ident mpos0 vel0 accel = do
 			else setMotionUser ident (fromJust mpos0) vel0 accel
 
 getPlayerStateByName :: String -> States -> PlayerState
-getPlayerStateByName name states = if length xs == 1 
-								then head xs
-								else error "State name duplicated or not defined"
+getPlayerStateByName name states = case (length xs) of
+							1 -> head xs
+							0 -> error $ "State " ++ (show name) ++ " not defined"
+							_ -> error $ "State " ++ (show name) ++ " duplicated"	
 				where xs = filter (\x -> stateName x == name) states
 
 setTriggersForPlayer :: StateT Env IO ()
@@ -618,119 +543,202 @@ setTriggersForPlayer = do
 		fallS = Nothing, 
 		trgStepS = 0}
 	
-setting1 :: StateT Env IO ()
-setting1 = do
-	a1 <- newActor ["img/walk_right_00.png", "img/walk_right_01.png", "img/walk_right_02.png", "img/walk_right_03.png", "img/jump_right_00.png"] Player 78 104
-	--setMotion a1 (P2 30 300) (P2 40 0) (P2 0 0)
+newNikki :: Double -> Double -> StateT Env IO ID
+newNikki x y = do
+	ident <- newActor ["img/walk_right_00.png", "img/walk_right_01.png", "img/walk_right_02.png", "img/walk_right_03.png", "img/jump_right_00.png"] Player 78 104
 	setTriggersForPlayer
+	setMotionUser ident (P2 x y) (P2 0 0) (P2 0 0)
+	return ident
 
-	a2 <- newActor ["img/box.png"] Block 66 66
-	setMotionUser a2 (P2 300 300) (P2 0 0) (P2 0 0)
+newBox :: Double -> Double -> StateT Env IO ID
+newBox x y = do
+	ident <- newActor ["img/box.png"] Block 66 66
+	setMotionUser ident (P2 x y) (P2 0 0) (P2 0 0)
+	return ident
 
-	a3 <- newActor ["img/box.png"] Block 66 66
-	setMotionUser a3 (P2 600 300) (P2 0 0) (P2 0 0)
+newStar :: Double -> Double -> StateT Env IO ID
+newStar x y = do
+	ident <- newActor ["img/star.png"] Bonus 62 66
+	setMotionUser ident (P2 x y) (P2 0 0) (P2 0 0)
+	return ident 
 
-	a4 <- newActor ["img/box.png"] Block 66 66
-	setMotionUser a4 (P2 900 300) (P2 0 0) (P2 0 0)
+newSignal :: Double -> Double -> StateT Env IO ID
+newSignal x y = do
+	ident <- newActor ["img/red.png", "img/yellow.png", "img/green.png"] Signal 43 200
+	setMotionUser ident (P2 x y) (P2 0 0) (P2 0 0)
+	return ident
 
-	a5 <- newActor ["img/box.png"] Block 66 66
-	setMotionUser a5 (P2 1200 300) (P2 0 0) (P2 0 0)
-
-	a6 <- newActor ["img/star.png"] Bonus 62 66
-	setMotionUser a6 (P2 200 0) (P2 0 0) (P2 0 0)
-	a7 <- newActor ["img/star.png"] Bonus 62 66
-	setMotionUser a7 (P2 300 0) (P2 0 0) (P2 0 0)
-
-	a8 <- newActor ["img/red.png", "img/yellow.png", "img/green.png"] Signal 43 200
-	setMotionUser a8 (P2 600 0) (P2 0 0) (P2 0 0)
-
-
-
-
-	
+newBorders :: StateT Env IO (ID, ID)
+newBorders = do
 	leftBorder <- newActor [] Block 20 600
 	setMotionUser leftBorder (P2 (-20) 0) (P2 0 0) (P2 0 0)
 
 	rightBorder <- newActor [] Block 20 600
 	setMotionUser rightBorder (P2 (fromIntegral sceneWidth) 0) (P2 0 0) (P2 0 0)
 
-states :: States
-states = [PlayerState { stateName = "start", 
-						startPos = Just $ P2 30 0, 
-						moveVelocity = P2 140 0, 
-						moveAccel = P2 (-80) 0, 
-						transition = [
-							Transition {onevent = EvStep 700, 
-										toStateName = "stop"}]},
-		  PlayerState { stateName = "stop",
-		  				startPos = Nothing,
-		  				moveVelocity = P2 0 0,
-		  				moveAccel = P2 0 0,
-		  				transition = [
-		  					Transition {onevent = EvStep 0,
-		  							    toStateName = "jump"}]},
-		  PlayerState { stateName = "jump",
-		  				startPos = Nothing,
-		  				moveVelocity = P2 60 (-200),
-		  				moveAccel = P2 0 100,
-		  				transition = [
-		  					Transition {onevent = EvHitground,
-		  								toStateName = "walk"}]},
-		  PlayerState { stateName = "walk",
-						startPos = Nothing,
-						moveVelocity = P2 40 0,
-						moveAccel = P2 0 0,
-						transition = []}
+	return (leftBorder, rightBorder)
 
 
-		  	]
 
-states2 = [PlayerState { stateName = "start",
-						 startPos = Just $ P2 30 0,
-						 moveVelocity = P2 (-40) (-150),
-						 moveAccel = P2 0 100,
-						 transition = []}]
+setting0 :: StateT Env IO ()
+setting0 = do
+	newNikki 100 0
+	newBox 0 0
+	newBorders
+	return ()
 
-states3 = [PlayerState {stateName = "start",
-						startPos = Just $ P2 0 0,
-						moveVelocity = P2 0 0,
-						moveAccel = P2 0 0,
-						transition = [
-							Transition {onevent = EvStep 0, toStateName = "go"}
-						]},
-		   PlayerState {stateName = "go",
-						startPos = Nothing,
-						moveVelocity = P2 100 0,
-						moveAccel = P2 0 0,
-						transition = [
-							Transition {onevent = EvHitblock, toStateName = "back"}
-						]},
-		   PlayerState {stateName = "back",
-		  				startPos = Nothing,
-		  				moveVelocity = P2 (-100) 0,
-		  				moveAccel = P2 0 0,
-		  				transition = [
-		  					Transition {onevent = EvHitblock, toStateName = "go"}
-		  				]}]
+setting1 :: StateT Env IO ()
+setting1 = do 
+    newNikki 20 0
+    newBox 500 0
+    newBorders
+    return ()
 
-states4 = [PlayerState { stateName = "start",
-						 startPos = Just $ P2 30 0,
-						 moveVelocity = P2 (40) (0),
-						 moveAccel = P2 0 0,
-						 transition = [
-						 	Transition {onevent = EvHitsignal,
-						 				toStateName = "stop"}
-						 ]},
-		  PlayerState { stateName = "stop",
-						startPos = Nothing,
-						moveVelocity = P2 0 0,
-						moveAccel = P2 0 0,
-						transition = [
-							Transition {onevent = EvSignal Red,
-										toStateName = "walk"}]},
-		  PlayerState { stateName = "walk",
-						startPos = Nothing,
-						moveVelocity = P2 (100) 0,
-						moveAccel = P2 0 0,
-						transition = []}
-			]
+setting2 :: StateT Env IO ()
+setting2 = do
+	newNikki 200 0
+	newBorders
+	newBox 100 0
+	newBox 100 66
+	newBox 500 0
+	newBox 500 66
+	newStar 110 132
+	newStar 510 132
+	return ()
+
+setting3 :: StateT Env IO ()
+setting3 = do
+    newNikki 20 0
+
+    newBox 200 0
+    newStar 210 66
+    newBox 270 0
+    newStar 280 66
+    newBox 340 100
+    newStar 350 166
+    newBox 410 100
+    newStar 420 166
+    newBox 480 200
+    newStar 490 266
+    newBox 550 200
+    newStar 560 266
+    return ()
+
+setting4 :: StateT Env IO ()
+setting4 = do
+	newNikki 200 0
+	newBorders
+	newBox 300 0
+	newBox 300 66
+	newBox 300 132
+	newBox 300 198
+	newStar 310 264
+	return ()	
+
+setting5 :: StateT Env IO ()
+setting5 = do
+	newNikki 50 0
+	newBox 300 300
+	newBox 600 300
+	newBox 900 300
+	newBox 1200 300
+	newStar 200 0
+	newStar 300 0
+	newSignal 600 0
+	newBox 800 0
+	newBox 866 0
+	newStar 810 66
+	newStar 876 66
+	newBorders
+	return ()
+
+setting11 :: StateT Env IO ()
+setting11 = do 
+	newNikki 20 0
+	return ()
+
+setting12 :: StateT Env IO ()
+setting12 = do 
+	newNikki 20 0
+	newBorders
+	return ()
+--states :: States
+--states = [PlayerState { stateName = "start", 
+--						startPos = Just $ P2 30 0, 
+--						moveVelocity = P2 140 0, 
+--						moveAccel = P2 (-80) 0, 
+--						transition = [
+--							Transition {onevent = EvStep 700, 
+--										toStateName = "stop"}]},
+--		  PlayerState { stateName = "stop",
+--		  				startPos = Nothing,
+--		  				moveVelocity = P2 0 0,
+--		  				moveAccel = P2 0 0,
+--		  				transition = [
+--		  					Transition {onevent = EvStep 0,
+--		  							    toStateName = "jump"}]},
+--		  PlayerState { stateName = "jump",
+--		  				startPos = Nothing,
+--		  				moveVelocity = P2 60 (-200),
+--		  				moveAccel = P2 0 100,
+--		  				transition = [
+--		  					Transition {onevent = EvHitground,
+--		  								toStateName = "walk"}]},
+--		  PlayerState { stateName = "walk",
+--						startPos = Nothing,
+--						moveVelocity = P2 40 0,
+--						moveAccel = P2 0 0,
+--						transition = []}
+
+
+--		  	]
+
+--states2 = [PlayerState { stateName = "start",
+--						 startPos = Just $ P2 30 0,
+--						 moveVelocity = P2 (-40) (-150),
+--						 moveAccel = P2 0 100,
+--						 transition = []}]
+
+--states3 = [PlayerState {stateName = "start",
+--						startPos = Just $ P2 0 0,
+--						moveVelocity = P2 0 0,
+--						moveAccel = P2 0 0,
+--						transition = [
+--							Transition {onevent = EvStep 0, toStateName = "go"}
+--						]},
+--		   PlayerState {stateName = "go",
+--						startPos = Nothing,
+--						moveVelocity = P2 100 0,
+--						moveAccel = P2 0 0,
+--						transition = [
+--							Transition {onevent = EvHitblock, toStateName = "back"}
+--						]},
+--		   PlayerState {stateName = "back",
+--		  				startPos = Nothing,
+--		  				moveVelocity = P2 (-100) 0,
+--		  				moveAccel = P2 0 0,
+--		  				transition = [
+--		  					Transition {onevent = EvHitblock, toStateName = "go"}
+--		  				]}]
+
+--states4 = [PlayerState { stateName = "start",
+--						 startPos = Just $ P2 30 0,
+--						 moveVelocity = P2 (40) (0),
+--						 moveAccel = P2 0 0,
+--						 transition = [
+--						 	Transition {onevent = EvHitsignal,
+--						 				toStateName = "stop"}
+--						 ]},
+--		  PlayerState { stateName = "stop",
+--						startPos = Nothing,
+--						moveVelocity = P2 0 0,
+--						moveAccel = P2 0 0,
+--						transition = [
+--							Transition {onevent = EvSignal Red,
+--										toStateName = "walk"}]},
+--		  PlayerState { stateName = "walk",
+--						startPos = Nothing,
+--						moveVelocity = P2 (100) 0,
+--						moveAccel = P2 0 0,
+--						transition = []}
+--			]

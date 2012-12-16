@@ -1,0 +1,10 @@
+START:
+    stand
+    on Step = 0 
+    JUMPR
+JUMPR:
+    jumpRightHigh
+    on HitGround LEFT
+LEFT:
+    walkLeftFast
+    on Step = 20 JUMPR

@@ -32,3 +32,13 @@ process input = convertS statement
 toLowerS :: String -> String
 toLowerS [] = []
 toLowerS (x:xs) = toLower x : toLowerS xs
+
+t0 = processFile "scripts/simplejump.src" setting0
+t1 = processFile "scripts/jumpover.src" setting1
+t2 = processFile "scripts/bounce.src" setting2
+t3 = processFile "scripts/climbup.src" setting3
+t4 = processFile "scripts/jumptoblock.src" setting4
+t5 = processFile "scripts/signal.src" setting5
+
+t00 = processFile "scripts/script11.src" setting11
+t01 = processFile "scripts/script12.src" setting12

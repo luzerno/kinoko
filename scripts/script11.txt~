@@ -1,0 +1,11 @@
+start :
+    Position (20,0)
+    walkRightSlow
+
+
+setting11 :: StateT Env IO ()
+setting11 = do 
+	newNikki
+	return ()
+	
+

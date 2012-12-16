@@ -1,0 +1,17 @@
+START :
+    stand
+    on Step = 0 RIGHT
+RIGHT :
+    walkRightSlow
+    on HitBlock LEFT
+LEFT : 
+    walkLeftSlow
+    on Step = 80 RIGHT2
+RIGHT2 :
+    walkRightSlow
+    on Step = 30 JUMP1
+JUMP1 :
+    jumpRight
+    on HitGround RIGHT
+
+

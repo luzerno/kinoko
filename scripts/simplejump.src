@@ -1,0 +1,20 @@
+START:
+    stand
+    on step = 30 JUMP1
+JUMP1:
+    velocity (30, -100)
+    acceleration (0, 100)
+    on HitGround JUMP2
+JUMP2:
+    velocity (50, -200)
+    acceleration (0, 100)
+    on HitGround JUMP3
+JUMP3:
+    velocity (-30, -100)
+    acceleration (0, 100)
+    on HitGround JUMP4
+JUMP4:
+    velocity (-50, -200)
+    acceleration (0, 100)
+    on HitGround JUMP1
+

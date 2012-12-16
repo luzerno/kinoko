@@ -1,0 +1,18 @@
+start :
+    Position (20,0)
+    stand
+    on step = 0 goright
+
+goright :
+    walkRightFast
+    on hitblock goleft
+
+goleft :
+    walkLeftFast
+    on hitblock goright
+
+setting12 :: StateT Env IO ()
+setting12 = do 
+	newNikki
+	newBorders
+	return ()

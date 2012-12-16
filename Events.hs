@@ -68,7 +68,8 @@ hitGroundEvent ident = e where
 					let otherActors = filter (\x -> label x == Block) $ map snd others
 					let otherPos = zip (map positionS otherActors) $ zip (map width otherActors) (map height otherActors)
 					let hitResBool = map (hitTop myPos) otherPos
-					let hitPosY = map ((\(P2 x y) -> y) . snd) $ filter fst $ zip hitResBool $ map (positionS . snd) $ tail $ fst as
+
+					let hitPosY = map ((\(P2 x y) -> y) . snd) $ filter fst $ zip hitResBool $ map positionS otherActors
 					if length hitPosY >= 1
 						then return (e, Just $ minimum hitPosY)
 						else return (e, Nothing)
